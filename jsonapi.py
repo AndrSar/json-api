@@ -11,42 +11,70 @@ class Specification:
             sig = inspect.signature(method)
             self._methods[method.__name__] = (sig, method)
 
-    def invoke_method_from_json_request(self, json_request):
-        if 'method' not in json_request:
-            raise MethodIsNotSpecifiedError()
+    def invoke_method_from_json_request(self, json_request) -> Response:
+        requested_method = None
+        requested_args = None
 
-        if 'args' not in json_request:
-            raise MethodArgumentsAreNotSpecifiedError()
+        try:
+            try:
+                requested_method = json_request['method']
+            except KeyError:
+                raise MethodIsNotSpecifiedError()
 
-        requested_method = json_request['method']
-        if requested_method not in self._methods:
-            raise NoSuchMethodError(requested_method)
+            try:
+                requested_args = json_request['args']
+            except KeyError:
+                raise MethodArgumentsAreNotSpecifiedError()
 
-        sig, method = self._methods[requested_method]
+            try:
+                sig, method = self._methods[requested_method]
+            except KeyError:
+                raise NoSuchMethodError(requested_method)
+        
+        except Error as e:
+            return e.response
+
 
     def check_method_arguments(self, sig, method, args):
-        #for param in sig.parameters.values():
-        #    if param.default == param.empty:
-        pass
+        try:
+            for param in sig.parameters.values():
+                if param.default == param.empty:
+                    if (param.name in args)
+
+
+
+class Response:
+    def __init__(self, status: int, description: str, result=None):
+        self._status = status
+        self._description = description
+        self._result = result
+
+    
+
+    def to_json_str(self):
+        return {
+            'status': self._status,
+            'description': self._description,
+            'result': self._result
+            }
 
 
 class Error(RuntimeError):
-    def __init__(self, descr: str):
-        self.code = 1
-        self.descr = descr
+    def __init__(self, status: int, descr: str):
+        self.response = Response(status, descr)
 
 
 class MethodIsNotSpecifiedError(Error):
     def __init__(self):
-        super().__init__('method is not specified')
+        super().__init__(1, 'method is not specified')
 
 
 class MethodArgumentsAreNotSpecifiedError(Error):
     def __init__(self):
-        super().__init__('method arguments (`args list`) are not specified')
+        super().__init__(2, 'method arguments (`args list`) are not specified')
 
 
 class NoSuchMethodError(Error):
     def __init__(self, input_method_name):
-        super().__init__('no method `%s` exists' % input_method_name)
+        super().__init__(3, 'no method `%s` exists' % input_method_name)
     
