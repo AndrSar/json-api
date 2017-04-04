@@ -1,4 +1,3 @@
-import json
 import inspect
 
 
@@ -35,11 +34,14 @@ class Specification:
             except KeyError:
                 raise NoSuchMethodError(requested_method)
 
-        except Error as e:
-            return e.response
+        except Error as error:
+            return error.response
 
 
     def check_method_arguments(self, sig, args):
+        if len(sig.parameters) != len(args):
+            raise WrongArgumentsNumberError(len(args), len(sig.parameters))
+
         for param in sig.parameters.values():
             try:
                 arg = args[param.name]
@@ -75,6 +77,7 @@ class Result:
 
 class Error(RuntimeError):
     def __init__(self, type, descr: str):
+        super().__init__(descr)
         self.response = Result(descr, None, type)
 
 
@@ -96,6 +99,11 @@ class NoSuchMethodError(Error):
 class RequiredArgumentIsMissedError(Error):
     def __init__(self, arg_name: str):
         super().__init__(type(self), 'required argument `%s` is missed' % arg_name)
+
+
+class WrongArgumentsNumberError(Error):
+    def __init__(self, received: int, expected: int):
+        super().__init__(type(self), 'wrong arguments number, expected %u, but got %u' % (expected, received))
 
 
 class InvalidArgumentTypeError(Error):
