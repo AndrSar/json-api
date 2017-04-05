@@ -5,10 +5,10 @@ class Specification:
     def __init__(self):
         self._methods = dict()
 
-    def add_method(self, method):
+    def add_method(self, method, validation_predicates=dict()):
         if callable(method):
             sig = inspect.signature(method)
-            self._methods[method.__name__] = (sig, method)
+            self._methods[method.__name__] = (sig, method, validation_predicates)
 
     def invoke_method(self, dictionary):
         requested_method = None
@@ -26,8 +26,8 @@ class Specification:
                 raise MethodArgumentsAreNotSpecifiedError()
 
             try:
-                sig, method = self._methods[requested_method]
-                self.check_method_arguments(sig, requested_args)
+                sig, method, predicates = self._methods[requested_method]
+                self._check_method_arguments(sig, requested_args, predicates)
                 result = method(**requested_args)
                 return Result('OK', result)
 
@@ -38,21 +38,26 @@ class Specification:
             return error.response
 
 
-    def check_method_arguments(self, sig, args):
+    def _check_method_arguments(self, sig, args, predicates):
         if len(sig.parameters) != len(args):
             raise WrongArgumentsNumberError(len(args), len(sig.parameters))
 
         for param in sig.parameters.values():
             try:
-                arg = args[param.name]
+                param_name = param.name
+                arg = args[param_name]
                 if param.annotation != param.empty:
                     if param.annotation is not type(arg):
                         received_type = type(arg).__name__
                         expected_type = param.annotation.__name__
-                        raise InvalidArgumentTypeError(param.name, received_type, expected_type)
+                        raise InvalidArgumentTypeError(param_name, received_type, expected_type)
+
+                if param_name in predicates:
+                    if not predicates[param_name](arg):
+                        raise InvalidArgumentValueError(param_name)
+
             except KeyError:
                 raise RequiredArgumentIsMissedError(param.name)
-
 
 
 class Result:
@@ -109,3 +114,8 @@ class WrongArgumentsNumberError(Error):
 class InvalidArgumentTypeError(Error):
     def __init__(self, name: str, received: str, expected: str):
         super().__init__(type(self), 'argument `%s` has invalid type `%s`, `%s` expected' % (name, received, expected))
+
+
+class InvalidArgumentValueError(Error):
+    def __init__(self, name: str):
+        super().__init__(type(self), 'value of argument `%s` does not pass predicate condition' % name)
